@@ -1,0 +1,96 @@
+{
+  "preset": "garage.json",
+  "version": 1,
+  "scene": "garage-vision",
+  "units": "mm",
+  "origin": "workbench center, top surface (y=0, y-up in viewer)",
+  "notes": "FZ-E build QA visualizer. Camera frustum is shown geometry, not a simulation. Out of scope v1: live feed, YOLO overlay.",
+  "palette": {
+    "bench_zinc": "#52525b",
+    "steel": "#a1a1aa",
+    "ghost": "#8b8fa3",
+    "pass_green": "#16a34a",
+    "fail_red": "#dc2626",
+    "marker_amber": "#f59e0b",
+    "stripe_yellow": "#facc15",
+    "camera_body": "#27272a",
+    "frustum": "#38bdf8"
+  },
+  "slots": {
+    "camera_elp": {
+      "module": "OV9281",
+      "sensor_px": [1280, 800],
+      "board_mm": [38, 38, 12],
+      "position": [0, 650, 250],
+      "look_at": [0, 0, 0],
+      "fov_h_deg": 77,
+      "fov_v_deg": 55,
+      "frustum_length_mm": 900,
+      "mount_arm": {
+        "from": [750, -80, 350],
+        "to": [0, 650, 250],
+        "tube_dia_mm": 25
+      }
+    },
+    "bench_bike_zone": {
+      "bench_top_mm": [1800, 80, 800],
+      "bench_top_center": [0, -40, 0],
+      "leg_mm": [60, 820, 60],
+      "legs_at": [[-820, -490, -340], [820, -490, -340], [-820, -490, 340], [820, -490, 340]],
+      "frame_triangle_ghost": {
+        "tube_dia_mm": 30,
+        "points": {
+          "bottom_bracket": [-150, 60, 0],
+          "head_top": [250, 320, 0],
+          "seat_top": [-280, 340, 0]
+        },
+        "tubes": [["bottom_bracket", "head_top"], ["head_top", "seat_top"], ["seat_top", "bottom_bracket"]]
+      },
+      "checks": {
+        "check_torque": {
+          "label": "Torque stripe",
+          "joint": "head_top",
+          "bolt": { "center": [250, 320, 0], "dia_mm": 17, "len_mm": 40, "axis": "z" },
+          "stripe": { "len_mm": 60, "w_mm": 8, "color": "stripe_yellow" },
+          "rule": "pass = stripe continuous across bolt and joint",
+          "state": "pass"
+        },
+        "check_weld": {
+          "label": "Weld spots",
+          "joint": "bottom_bracket",
+          "center": [-150, 60, 0],
+          "spots_required": 6,
+          "spot_dia_mm": [4, 7],
+          "spots": [
+            [-178, 60, 8], [-164, 76, 10], [-136, 76, 10],
+            [-122, 60, 8], [-136, 44, 10], [-164, 44, 10]
+          ],
+          "rule": "pass = all 6 spots present, dia 4-7mm",
+          "state": "pass"
+        },
+        "check_bin": {
+          "label": "Parts bin",
+          "bin_mm": [300, 200, 150],
+          "bin_center": [-550, 100, 220],
+          "count": 11,
+          "bom_qty": 12,
+          "rule": "pass = count matches BOM qty",
+          "state": "fail"
+        }
+      }
+    },
+    "verdict_bar": {
+      "entries": ["check_torque", "check_weld", "check_bin"],
+      "photo_log": { "type": "stub", "label": "Photo log" }
+    }
+  },
+  "cameras": {
+    "CAM_OVERHEAD": { "purpose": "bin counting view", "position": [-300, 1500, 220], "look_at": [-350, 0, 150] },
+    "CAM_CLOSEUP": { "purpose": "torque/weld macro view", "position": [180, 420, 560], "look_at": [50, 190, 0] },
+    "CAM_PERSP": { "purpose": "whole station hero (thumbnail default)", "position": [1500, 950, 1750], "look_at": [0, 100, 0] }
+  },
+  "qa": {
+    "thumbnail_camera": "CAM_PERSP",
+    "requirement": "all 3 checks + verdict visible at thumbnail"
+  }
+}

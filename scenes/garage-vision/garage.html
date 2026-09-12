@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>garage-vision — FZ-E build QA (preset: garage.json)</title>
+<style>
+  :root { --green:#16a34a; --red:#dc2626; --amber:#f59e0b; --zinc:#52525b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#101014;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  #hud { position:fixed; top:12px; left:12px; display:flex; gap:8px; z-index:5; }
+  #hud button { background:#1c1c22; color:#e4e4e7; border:1px solid #3f3f46;
+    border-radius:8px; padding:8px 12px; font-size:13px; cursor:pointer; }
+  #hud button.active { border-color:var(--amber); color:#fcd34d; }
+  #title { position:fixed; top:12px; right:14px; color:#a1a1aa; font-size:12px;
+    text-align:right; z-index:5; line-height:1.5; }
+  #verdict { position:fixed; left:0; right:0; bottom:0; z-index:5;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:12px; background:rgba(12,12,16,.88); border-top:1px solid #3f3f46; }
+  .pill { border:none; border-radius:999px; padding:8px 16px; font-size:13px;
+    font-weight:600; cursor:pointer; color:#fff; }
+  .pill.pass { background:var(--green); }
+  .pill.fail { background:var(--red); }
+  #photo { background:transparent; color:#e4e4e7; border:1px dashed #71717a;
+    border-radius:999px; padding:8px 16px; font-size:13px; cursor:pointer; }
+  #toast { position:fixed; bottom:70px; left:50%; transform:translateX(-50%);
+    background:#27272a; color:#e4e4e7; font-size:13px; padding:8px 14px;
+    border-radius:8px; display:none; z-index:6; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <button data-cam="CAM_OVERHEAD">Overhead</button>
+  <button data-cam="CAM_CLOSEUP">Closeup</button>
+  <button data-cam="CAM_PERSP" class="active">Persp</button>
+</div>
+<div id="title">garage-vision · FZ-E build QA<br>preset: garage.json · units: mm</div>
+<div id="verdict"></div>
+<button id="photo" style="display:none"></button>
+<div id="toast"></div>
+<script src="vendor/three.min.js"></script>
+<script type="application/json" id="preset">
+{
+  "preset": "garage.json",
+  "version": 1,
+  "scene": "garage-vision",
+  "units": "mm",
+  "origin": "workbench center, top surface (y=0, y-up in viewer)",
+  "notes": "FZ-E build QA visualizer. Camera frustum is shown geometry, not a simulation. Out of scope v1: live feed, YOLO overlay.",
+  "palette": {
+    "bench_zinc": "#52525b",
+    "steel": "#a1a1aa",
+    "ghost": "#8b8fa3",
+    "pass_green": "#16a34a",
+    "fail_red": "#dc2626",
+    "marker_amber": "#f59e0b",
+    "stripe_yellow": "#facc15",
+    "camera_body": "#27272a",
+    "frustum": "#38bdf8"
+  },
+  "slots": {
+    "camera_elp": {
+      "module": "OV9281",
+      "sensor_px": [1280, 800],
+      "board_mm": [38, 38, 12],
+      "position": [0, 650, 250],
+      "look_at": [0, 0, 0],
+      "fov_h_deg": 77,
+      "fov_v_deg": 55,
+      "frustum_length_mm": 900,
+      "mount_arm": {
+        "from": [750, -80, 350],
+        "to": [0, 650, 250],
+        "tube_dia_mm": 25
+      }
+    },
+    "bench_bike_zone": {
+      "bench_top_mm": [1800, 80, 800],
+      "bench_top_center": [0, -40, 0],
+      "leg_mm": [60, 820, 60],
+      "legs_at": [[-820, -490, -340], [820, -490, -340], [-820, -490, 340], [820, -490, 340]],
+      "frame_triangle_ghost": {
+        "tube_dia_mm": 30,
+        "points": {
+          "bottom_bracket": [-150, 60, 0],
+          "head_top": [250, 320, 0],
+          "seat_top": [-280, 340, 0]
+        },
+        "tubes": [["bottom_bracket", "head_top"], ["head_top", "seat_top"], ["seat_top", "bottom_bracket"]]
+      },
+      "checks": {
+        "check_torque": {
+          "label": "Torque stripe",
+          "joint": "head_top",
+          "bolt": { "center": [250, 320, 0], "dia_mm": 17, "len_mm": 40, "axis": "z" },
+          "stripe": { "len_mm": 60, "w_mm": 8, "color": "stripe_yellow" },
+          "rule": "pass = stripe continuous across bolt and joint",
+          "state": "pass"
+        },
+        "check_weld": {
+          "label": "Weld spots",
+          "joint": "bottom_bracket",
+          "center": [-150, 60, 0],
+          "spots_required": 6,
+          "spot_dia_mm": [4, 7],
+          "spots": [
+            [-178, 60, 8], [-164, 76, 10], [-136, 76, 10],
+            [-122, 60, 8], [-136, 44, 10], [-164, 44, 10]
+          ],
+          "rule": "pass = all 6 spots present, dia 4-7mm",
+          "state": "pass"
+        },
+        "check_bin": {
+          "label": "Parts bin",
+          "bin_mm": [300, 200, 150],
+          "bin_center": [-550, 100, 220],
+          "count": 11,
+          "bom_qty": 12,
+          "rule": "pass = count matches BOM qty",
+          "state": "fail"
+        }
+      }
+    },
+    "verdict_bar": {
+      "entries": ["check_torque", "check_weld", "check_bin"],
+      "photo_log": { "type": "stub", "label": "Photo log" }
+    }
+  },
+  "cameras": {
+    "CAM_OVERHEAD": { "purpose": "bin counting view", "position": [-300, 1500, 220], "look_at": [-350, 0, 150] },
+    "CAM_CLOSEUP": { "purpose": "torque/weld macro view", "position": [180, 420, 560], "look_at": [50, 190, 0] },
+    "CAM_PERSP": { "purpose": "whole station hero (thumbnail default)", "position": [1500, 950, 1750], "look_at": [0, 100, 0] }
+  },
+  "qa": {
+    "thumbnail_camera": "CAM_PERSP",
+    "requirement": "all 3 checks + verdict visible at thumbnail"
+  }
+}
+</script>
+<script>
+(function () {
+  'use strict';
+  var preset = JSON.parse(document.getElementById('preset').textContent);
+  // Prefer the sidecar garage.json when served over http; file:// falls back to inline.
+  function withPreset(p) { boot(p); }
+  if (window.location.protocol.indexOf('http') === 0) {
+    fetch('garage.json').then(function (r) { return r.json(); })
+      .then(withPreset).catch(function () { withPreset(preset); });
+  } else { withPreset(preset); }
+
+  function boot(P) {
+    var pal = P.palette;
+    var app = document.getElementById('app');
+    var renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e) {
+      app.innerHTML = '<p style="color:#e4e4e7;padding:40px">WebGL unavailable: ' + e.message + '</p>';
+      return;
+    }
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(window.innerWidth, window.innerHeight - 57);
+    app.appendChild(renderer.domElement);
+
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101014);
+    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - 57), 5, 20000);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    var key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(1200, 1600, 900); scene.add(key);
+    var grid = new THREE.GridHelper(4000, 20, 0x3f3f46, 0x27272a);
+    grid.position.y = -900; scene.add(grid);
+
+    function mat(color, opts) {
+      return new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(color), roughness: 0.8, metalness: 0.15 }, opts || {}));
+    }
+    function box(w, h, d, color, x, y, z, opts) {
+      var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, opts));
+      m.position.set(x, y, z); scene.add(m); return m;
+    }
+    function tube(a, b, dia, color, opts) {
+      var va = new THREE.Vector3(a[0], a[1], a[2]), vb = new THREE.Vector3(b[0], b[1], b[2]);
+      var len = va.distanceTo(vb);
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(dia / 2, dia / 2, len, 16), mat(color, opts));
+      m.position.copy(va).add(vb).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize());
+      scene.add(m); return m;
+    }
+    function label(text, color, scale) {
+      var c = document.createElement('canvas'); c.width = 256; c.height = 96;
+      var g = c.getContext('2d');
+      g.fillStyle = 'rgba(10,10,14,0.85)'; g.fillRect(0, 0, 256, 96);
+      g.fillStyle = color; g.font = 'bold 44px sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 50);
+      var t = new THREE.CanvasTexture(c);
+      var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
+      s.scale.set(220 * (scale || 1), 82 * (scale || 1), 1);
+      scene.add(s); return s;
+    }
+
+    var zone = P.slots.bench_bike_zone;
+    var checks = zone.checks;
+
+    // 1. bench + legs
+    box(zone.bench_top_mm[0], zone.bench_top_mm[1], zone.bench_top_mm[2],
+      pal.bench_zinc, zone.bench_top_center[0], zone.bench_top_center[1], zone.bench_top_center[2]);
+    zone.legs_at.forEach(function (p) {
+      box(zone.leg_mm[0], zone.leg_mm[1], zone.leg_mm[2], pal.bench_zinc, p[0], p[1], p[2]);
+    });
+
+    // frame triangle ghost
+    var pts = zone.frame_triangle_ghost.points;
+    zone.frame_triangle_ghost.tubes.forEach(function (t) {
+      tube(pts[t[0]], pts[t[1]], zone.frame_triangle_ghost.tube_dia_mm, pal.ghost,
+        { transparent: true, opacity: 0.55 });
+    });
+
+    // 2. ELP camera module + frustum + mount arm
+    var elp = P.slots.camera_elp;
+    box(elp.board_mm[0], elp.board_mm[1], elp.board_mm[2], pal.camera_body,
+      elp.position[0], elp.position[1], elp.position[2]);
+    tube(elp.mount_arm.from, elp.mount_arm.to, elp.mount_arm.tube_dia_mm, pal.steel);
+    (function frustum() {
+      var L = elp.frustum_length_mm;
+      var hw = Math.tan(THREE.MathUtils.degToRad(elp.fov_h_deg / 2)) * L;
+      var hh = Math.tan(THREE.MathUtils.degToRad(elp.fov_v_deg / 2)) * L;
+      var geo = new THREE.BufferGeometry();
+      var v = new Float32Array([0, 0, 0,  -hw, -hh, -L,   hw, -hh, -L,   hw, hh, -L,   -hw, hh, -L]);
+      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      geo.setIndex([0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 1, 2, 3, 1, 3, 4]);
+      geo.computeVertexNormals();
+      var mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: new THREE.Color(pal.frustum), transparent: true, opacity: 0.10,
+        side: THREE.DoubleSide, depthWrite: false }));
+      var edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: new THREE.Color(pal.frustum) }));
+      var grp = new THREE.Group(); grp.add(mesh); grp.add(edge);
+      grp.position.set(elp.position[0], elp.position[1], elp.position[2]);
+      grp.lookAt(elp.look_at[0], elp.look_at[1], elp.look_at[2]);
+      scene.add(grp);
+    })();
+    var camTag = label('ELP OV9281 1280x800', '#7dd3fc', 0.9);
+    camTag.position.set(elp.position[0], elp.position[1] + 90, elp.position[2]);
+
+    // 3a. torque check: bolt + stripe (two halves; fail = offset break)
+    var tq = checks.check_torque;
+    var bolt = new THREE.Mesh(new THREE.CylinderGeometry(tq.bolt.dia_mm / 2, tq.bolt.dia_mm / 2, tq.bolt.len_mm, 20),
+      mat(pal.steel, { metalness: 0.7, roughness: 0.35 }));
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(tq.bolt.center[0], tq.bolt.center[1], tq.bolt.center[2]);
+    scene.add(bolt);
+    var stripeMat = mat(pal[checks.check_torque.stripe.color] || '#facc15', { roughness: 0.6 });
+    var half = new THREE.BoxGeometry(tq.stripe.len_mm / 2, tq.stripe.w_mm, 3);
+    var sA = new THREE.Mesh(half, stripeMat);
+    var sB = new THREE.Mesh(half, stripeMat);
+    sA.position.set(tq.bolt.center[0] - tq.stripe.len_mm / 4, tq.bolt.center[1], tq.bolt.center[2] + 22);
+    sB.position.set(tq.bolt.center[0] + tq.stripe.len_mm / 4, tq.bolt.center[1], tq.bolt.center[2] + 22);
+    scene.add(sA); scene.add(sB);
+    var tqTag = label('TORQUE', pal.marker_amber, 0.8);
+    tqTag.position.set(tq.bolt.center[0], tq.bolt.center[1] + 110, tq.bolt.center[2]);
+
+    // 3b. weld check: 6 spot markers
+    var weld = checks.check_weld;
+    var spotMeshes = weld.spots.map(function (p) {
+      var m = new THREE.Mesh(new THREE.SphereGeometry(5, 14, 12), mat(pal.marker_amber, { roughness: 0.5 }));
+      m.position.set(p[0], p[1], p[2]); scene.add(m); return m;
+    });
+    var weldTag = label('WELD 6/6', pal.marker_amber, 0.8);
+    weldTag.position.set(weld.center[0], weld.center[1] - 110, weld.center[2] + 40);
+
+    // 3c. bin check: box + count readout
+    var bin = checks.check_bin;
+    var binMesh = box(bin.bin_mm[0], bin.bin_mm[1], bin.bin_mm[2], pal.steel,
+      bin.bin_center[0], bin.bin_center[1], bin.bin_center[2], { transparent: true, opacity: 0.85 });
+    var binTag = label('BIN ' + bin.count + '/' + bin.bom_qty, pal.marker_amber, 0.9);
+    binTag.position.set(bin.bin_center[0], bin.bin_center[1] + 170, bin.bin_center[2]);
+
+    // verdict bar
+    var verdict = document.getElementById('verdict');
+    var toast = document.getElementById('toast');
+    function showToast(t) { toast.textContent = t; toast.style.display = 'block';
+      setTimeout(function () { toast.style.display = 'none'; }, 1800); }
+    function stateOf(name) { return checks[name].state; }
+    function paintTag(sprite, text, color) {
+      var c = sprite.material.map.image, g = c.getContext('2d');
+      g.fillStyle = 'rgba(10,10,14,0.85)'; g.fillRect(0, 0, 256, 96);
+      g.fillStyle = color; g.font = 'bold 40px sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(text, 128, 50);
+      sprite.material.map.needsUpdate = true;
+    }
+    function renderVerdict() {
+      verdict.innerHTML = '';
+      P.slots.verdict_bar.entries.forEach(function (name) {
+        var c = checks[name];
+        var b = document.createElement('button');
+        b.className = 'pill ' + c.state;
+        b.textContent = c.label + ': ' + c.state.toUpperCase();
+        b.title = c.rule + ' (click to toggle demo state)';
+        b.onclick = function () {
+          c.state = (c.state === 'pass') ? 'fail' : 'pass';
+          applyStates(); renderVerdict();
+        };
+        verdict.appendChild(b);
+      });
+      var ph = document.createElement('button');
+      ph.id = 'photo'; ph.style.display = '';
+      ph.textContent = '📷 ' + P.slots.verdict_bar.photo_log.label + ' (stub)';
+      ph.onclick = function () { showToast('photo-log is a v1 stub — no photo taken'); };
+      verdict.appendChild(ph);
+    }
+    function applyStates() {
+      // torque: fail breaks the stripe
+      if (tq.state === 'pass') { sB.position.y = sA.position.y; sB.rotation.z = 0; }
+      else { sB.position.y = sA.position.y + 14; sB.rotation.z = 0.35; }
+      // weld: fail drops one spot
+      spotMeshes.forEach(function (m, i) { m.visible = (weld.state === 'pass') || (i !== 5); });
+      // bin recolor by state
+      binMesh.material.color.set(bin.state === 'pass' ? pal.pass_green : pal.fail_red);
+      refreshTags();
+    }
+    function refreshTags() {
+      var n = (bin.state === 'pass') ? bin.bom_qty : bin.count;
+      paintTag(binTag, 'BIN ' + n + '/' + bin.bom_qty,
+        bin.state === 'pass' ? pal.pass_green : pal.fail_red);
+      paintTag(weldTag, weld.state === 'pass' ? 'WELD 6/6' : 'WELD 5/6',
+        weld.state === 'pass' ? pal.marker_amber : pal.fail_red);
+      paintTag(tqTag, 'TORQUE', tq.state === 'pass' ? pal.pass_green : pal.fail_red);
+    }
+    applyStates(); renderVerdict();
+
+    // cameras
+    var target = new THREE.Vector3();
+    function goCam(name) {
+      var c = P.cameras[name];
+      camera.position.set(c.position[0], c.position[1], c.position[2]);
+      target.set(c.look_at[0], c.look_at[1], c.look_at[2]);
+      camera.lookAt(target);
+      document.querySelectorAll('#hud button').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.cam === name);
+      });
+    }
+    document.querySelectorAll('#hud button').forEach(function (b) {
+      b.onclick = function () { goCam(b.dataset.cam); };
+    });
+    goCam(P.qa.thumbnail_camera || 'CAM_PERSP');
+
+    // minimal drag-orbit
+    var drag = null;
+    renderer.domElement.addEventListener('pointerdown', function (e) {
+      drag = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = (e.clientX - drag.x) * 0.005, dy = (e.clientY - drag.y) * 0.005;
+      drag = { x: e.clientX, y: e.clientY };
+      var off = camera.position.clone().sub(target);
+      var sph = new THREE.Spherical().setFromVector3(off);
+      sph.theta -= dx; sph.phi = Math.min(Math.max(sph.phi - dy, 0.05), Math.PI - 0.05);
+      camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
+      camera.lookAt(target);
+    });
+    window.addEventListener('pointerup', function () { drag = null; });
+    window.addEventListener('resize', function () {
+      camera.aspect = window.innerWidth / (window.innerHeight - 57);
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight - 57);
+    });
+
+    (function loop() { requestAnimationFrame(loop); renderer.render(scene, camera); })();
+    window.__garageReady = true;
+  }
+})();
+</script>
+</body>
+</html>

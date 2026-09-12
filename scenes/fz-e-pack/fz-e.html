@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FZ-E Pack Envelope — fz-e-pack v1</title>
+<style>
+  :root { --paper:#fafafa; --ink:#27272a; --muted:#71717a; --line:#e4e4e7;
+          --zinc:#52525b; --violet:#7c6bb3; --red:#dc2626; --green:#16a34a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+         font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { padding:20px 24px 0; max-width:1200px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { margin:0 0 12px; color:var(--muted); font-size:13px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0 16px; }
+  .toggle button { font:inherit; font-size:14px; padding:8px 16px; border-radius:999px;
+    border:1px solid var(--line); background:#fff; cursor:pointer; }
+  .toggle button[aria-pressed="true"] { background:var(--violet); color:#fff; border-color:var(--violet); }
+  #verdict { font-size:14px; font-weight:600; padding:8px 14px; border-radius:8px; }
+  #verdict.ok { background:#dcfce7; color:var(--green); }
+  #verdict.bad { background:#fee2e2; color:var(--red); }
+  main { max-width:1200px; margin:0 auto; padding:0 24px 32px;
+         display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:900px){ main.two { grid-template-columns:1fr 1fr; } }
+  figure { margin:0; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  figcaption { padding:10px 14px; font-size:13px; font-weight:600;
+    border-top:1px solid var(--line); color:var(--muted); }
+  svg { display:block; width:100%; height:auto; }
+  footer { max-width:1200px; margin:0 auto; padding:0 24px 32px; color:var(--muted); font-size:12px; }
+  svg text { font-family:ui-sans-serif,system-ui,sans-serif; paint-order:stroke; stroke:#fff; stroke-width:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FZ-E Pack Envelope Viewer</h1>
+  <p class="sub">Does the pack fit the triangle — before metal is cut. Units: mm. Origin: steering-head center, ground y=0, bike faces +X.</p>
+  <div class="bar">
+    <div class="toggle" role="group" aria-label="Pack voltage">
+      <button id="btn72" aria-pressed="true">72V · 280×180×200 · 32kg</button>
+      <button id="btn96" aria-pressed="false">96V · 430×280×200 · 42kg</button>
+    </div>
+    <span id="verdict" class="ok"></span>
+  </div>
+</header>
+<main class="two">
+  <figure><div id="vSide"></div><figcaption>CAM_SIDE — side elevation with dims</figcaption></figure>
+  <figure><div id="vTop"></div><figcaption>CAM_TOP — CG vs wheelbase</figcaption></figure>
+  <figure><div id="vPersp" style="grid-column:1/-1"></div><figcaption>CAM_PERSP — 3/4 hero</figcaption></figure>
+</main>
+<footer>Preset: scenes/fz-e-pack/fz-e.json (72V default, 96V toggle — never both). Frame #52525b · pack #7c6bb3 · interference #dc2626. v1: placeholder boxes, no STEP, no thermal.</footer>
+
+<script id="scene">
+"use strict";
+const PRESET = {"buildOrder":["frame","pack","controller/motor","clearance","cg"],"cameras":[{"dims":true,"id":"CAM_SIDE","projection":"orthographic","view":"side-elevation (X-Y plane)"},{"id":"CAM_TOP","projection":"orthographic","view":"top-down (X-Z plane), CG marker vs wheelbase"},{"hdri":"studio","id":"CAM_PERSP","projection":"perspective-ortho-3/4","view":"hero 3/4 (az -32deg, el 18deg)"}],"controller_box":{"center":[-780,760,0],"id":"controller_box","mass_kg":8,"mounts":["seat-rail L","seat-rail R"],"size":[200,120,140]},"defaultPack":"72v","derived":{"cg_72v":{"pct_wheelbase_from_rear":55.6,"x":-483.0,"y":530.0},"cg_96v":{"pct_wheelbase_from_rear":52.6,"x":-524.1,"y":521.6},"clearance_72v_mm":13.4,"clearance_72v_point":"pack BL corner to down-tube","clearance_96v_mm":-13.4,"clearance_96v_point":"pack TL corner to seat-tube","clearance_fail_mm":10.0,"fit_72v":true,"fit_96v":false,"tube_length_top_mm":700.3,"tube_length_down_mm":827.3,"tube_length_seat_mm":676.8,"wheelbase_mm":1380},"frame":{"facing":"+X","groundY":0,"origin":"steering-head center","units":"mm"},"frame_triangle":{"id":"frame_triangle","points":{"A_steer_top":[0,1000,0],"B_steer_bottom":[40,900,0],"C_bb":[-550,320,0],"D_rear_axle":[-1250,300,0],"E_seat":[-700,980,0],"F_front_axle":[130,300,0]},"stays":[{"dia":20,"from":"E_seat","id":"seat_stay","to":"D_rear_axle"},{"dia":20,"from":"C_bb","id":"chain_stay","to":"D_rear_axle"}],"tubes":[{"dia":40,"from":"A_steer_top","id":"top_tube","to":"E_seat"},{"dia":40,"from":"B_steer_bottom","id":"down_tube","to":"C_bb"},{"dia":40,"from":"C_bb","id":"seat_tube","to":"E_seat"}]},"motor_qs138":{"center":[-720,330,0],"id":"motor_qs138","mass_kg":14,"mounts":["swingarm pivot","torque arm"],"size":[220,200,160]},"pack_72v":{"center":[-305,560,0],"id":"pack_72v","mass_kg":32,"note":"low, central","size":[280,180,200]},"pack_96v":{"center":[-410,540,0],"id":"pack_96v","mass_kg":42,"note":"toggle vs 72V, never both","size":[430,280,200]},"palette":{"fail":"#dc2626","frame":"#52525b","ink":"#27272a","muted":"#71717a","pack":"#7c6bb3","paper":"#fafafa","pass":"#16a34a"},"preset":"fz-e","slots":["frame_triangle","pack_72v","pack_96v","controller_box","motor_qs138","clearance","cg"],"spec":"scenes/fz-e-pack/SCENE_SPEC.md v1","version":1,"wheels":{"front":{"center":[130,300,0],"r":300,"width":110},"rear":{"center":[-1250,300,0],"r":300,"width":130}}};
+
+// ---- loud slot binding: every SCENE_SPEC slot must exist ----
+for (const s of PRESET.slots) {
+  if (s === "clearance" || s === "cg") continue; // derived, computed below
+  if (!PRESET[s] && !PRESET.frame_triangle) throw new Error("unbound slot: " + s);
+}
+if (!PRESET.frame_triangle || !PRESET.pack_72v || !PRESET.pack_96v ||
+    !PRESET.controller_box || !PRESET.motor_qs138) throw new Error("unbound slot");
+
+const P = PRESET.frame_triangle.points;
+const INK = PRESET.palette.ink, ZINC = PRESET.palette.frame, VIOLET = PRESET.palette.pack,
+      RED = PRESET.palette.fail, GREEN = PRESET.palette.pass, MUTED = PRESET.palette.muted;
+
+// ---- geometry ----
+function segDist(p, a, b) {
+  const dx = b[0]-a[0], dy = b[1]-a[1], L2 = dx*dx+dy*dy;
+  let t = ((p[0]-a[0])*dx + (p[1]-a[1])*dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0]-(a[0]+t*dx), p[1]-(a[1]+t*dy));
+}
+function tubeSegs() {
+  return PRESET.frame_triangle.tubes.map(t => ({ id: t.id, a: P[t.from].slice(0,2), b: P[t.to].slice(0,2), dia: t.dia }));
+}
+function packRect(pack) {
+  const [cx, cy] = pack.center, [L, H] = pack.size;
+  return { x0: cx-L/2, x1: cx+L/2, y0: cy-H/2, y1: cy+H/2, cx, cy };
+}
+// min gap pack -> tube centrelines, minus tube radius
+function clearanceOf(pack) {
+  const r = packRect(pack);
+  const pts = [[r.x0,r.y0],[r.x1,r.y0],[r.x0,r.y1],[r.x1,r.y1],
+               [(r.x0+r.x1)/2,r.y0],[(r.x0+r.x1)/2,r.y1],[r.x0,(r.y0+r.y1)/2],[r.x1,(r.y0+r.y1)/2]];
+  let m = 1e9, at = "";
+  for (const p of pts) for (const t of tubeSegs()) {
+    const d = segDist(p, t.a, t.b) - t.dia/2;
+    if (d < m) { m = d; at = t.id; }
+  }
+  return { min: m, tube: at };
+}
+function cgOf(pack) {
+  const m = pack.mass_kg + PRESET.controller_box.mass_kg + PRESET.motor_qs138.mass_kg;
+  const c = PRESET.controller_box.center, mo = PRESET.motor_qs138.center;
+  const x = (pack.mass_kg*pack.center[0] + 8*c[0] + 14*mo[0]) / m;
+  const y = (pack.mass_kg*pack.center[1] + 8*c[1] + 14*mo[1]) / m;
+  return { x, y, pct: (x - P.D_rear_axle[0]) / PRESET.derived.wheelbase_mm * 100 };
+}
+function boxEdges(cx, cy, cz, L, H, W) {
+  const X = [cx-L/2, cx+L/2], Y = [cy-H/2, cy+H/2], Z = [cz-W/2, cz+W/2];
+  const c = [];
+  for (const x of X) for (const y of Y) for (const z of Z) c.push([x,y,z]);
+  const E = [[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]];
+  return { corners: c, edges: E.map(([a,b]) => [c[a], c[b]]) };
+}
+function wheelRing(cx, cy, r, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) { const a = i/n*2*Math.PI; pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a), 0]); }
+  return pts;
+}
+
+// ---- projections (y-up mm space) ----
+const sideProj = p => [p[0], p[1]];
+const topProj = p => [p[0], p[2]];
+const C0 = [-550, 500, 0], AZ = -32*Math.PI/180, EL = 18*Math.PI/180;
+function perspProj(p) {
+  const x = p[0]-C0[0], y = p[1]-C0[1], z = (p[2]||0)-C0[2];
+  const xr = x*Math.cos(AZ) + z*Math.sin(AZ);
+  const zr = -x*Math.sin(AZ) + z*Math.cos(AZ);
+  const yr = y*Math.cos(EL) - zr*Math.sin(EL);
+  return [xr, yr];
+}
+
+// ---- svg string builders (viewBox coords: y-down; Y(v) = Y0 - y) ----
+function ctx2d(x0, yTop, w, h) {
+  const S = [];
+  const X = x => x0 + x, Y = y => yTop - y;
+  return {
+    S, X, Y,
+    line(a, b, st, wd, dash) {
+      S.push(`<line x1="${X(a[0]).toFixed(1)}" y1="${Y(a[1]).toFixed(1)}" x2="${X(b[0]).toFixed(1)}" y2="${Y(b[1]).toFixed(1)}" stroke="${st}" stroke-width="${wd}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linecap="round"/>`);
+    },
+    poly(pts, st, wd, fill, dash) {
+      const s = pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+      S.push(`<polygon points="${s}" fill="${fill||"none"}" stroke="${st}" stroke-width="${wd}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linejoin="round"/>`);
+    },
+    circle(p, r, st, wd, fill) {
+      S.push(`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="${r}" stroke="${st}" stroke-width="${wd}" fill="${fill||"none"}"/>`);
+    },
+    dot(p, r, fill) { S.push(`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="${r}" fill="${fill}"/>`); }
+  };
+}
+function label(S, labels, x, y, text, fs, anchor) {
+  anchor = anchor || "middle";
+  const w = text.length * 0.62 * fs, h = fs * 1.25;
+  const rx = anchor === "middle" ? x - w/2 : (anchor === "start" ? x : x - w);
+  labels.push({ x: rx, y: y - h/2, w, h, text });
+  return `<text x="${x.toFixed(1)}" y="${(y + fs*0.35).toFixed(1)}" font-size="${fs}" text-anchor="${anchor}" fill="${INK}">${text}</text>`;
+}
+function labelsOverlap(labels) {
+  for (let i = 0; i < labels.length; i++) for (let j = i+1; j < labels.length; j++) {
+    const a = labels[i], b = labels[j];
+    if (a.x < b.x+b.w && b.x < a.x+a.w && a.y < b.y+b.h && b.y < a.y+a.h)
+      return `OVERLAP: "${a.text}" x "${b.text}"`;
+  }
+  return null;
+}
+function drawFrame(g, proj, tubeWidth) {
+  for (const t of tubeSegs()) {
+    const a3 = [t.a[0], t.a[1], 0], b3 = [t.b[0], t.b[1], 0];
+    g.line(proj(a3), proj(b3), ZINC, tubeWidth || t.dia);
+  }
+  for (const s of PRESET.frame_triangle.stays) {
+    const a3 = [P[s.from][0], P[s.from][1], 0], b3 = [P[s.to][0], P[s.to][1], 0];
+    g.line(proj(a3), proj(b3), ZINC, (tubeWidth ? tubeWidth/2 : s.dia), "10 8");
+  }
+}
+function drawBox(g, proj, obj, edge, fill, dash) {
+  const [cx, cy, cz] = obj.center, [L, H, W] = obj.size;
+  for (const [a, b] of boxEdges(cx, cy, cz, L, H, W).edges)
+    g.line(proj(a), proj(b), edge, 5, dash);
+  void fill;
+}
+
+// ---- CAM_SIDE ----
+function renderSide(packKey) {
+  const pack = PRESET[packKey === "72v" ? "pack_72v" : "pack_96v"];
+  const cl = clearanceOf(pack), cg = cgOf(pack), r = packRect(pack);
+  const labels = [];
+  const g = ctx2d(1450, 1150, 1800, 1300); // x in [-1450,350], y in [-150,1150]
+  const S = g.S;
+  S.push(`<rect x="0" y="0" width="1800" height="1300" fill="#fff"/>`);
+  g.line([-1450, 0], [350, 0], "#e4e4e7", 4); // ground
+  // wheels
+  for (const k of ["rear", "front"]) {
+    const w = PRESET.wheels[k];
+    g.circle(sideProj(w.center), w.r, INK, 8);
+    g.dot(sideProj(w.center), 14, INK);
+  }
+  drawFrame(g, sideProj);
+  // pack
+  const bad = cl.min < PRESET.derived.clearance_fail_mm;
+  g.poly([[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]], bad ? RED : VIOLET, bad ? 8 : 5, "rgba(124,107,179,0.18)");
+  // controller + motor placeholders
+  const cb = PRESET.controller_box, mo = PRESET.motor_qs138;
+  const cbr = { x0: cb.center[0]-cb.size[0]/2, x1: cb.center[0]+cb.size[0]/2, y0: cb.center[1]-cb.size[1]/2, y1: cb.center[1]+cb.size[1]/2 };
+  g.poly([[cbr.x0,cbr.y0],[cbr.x1,cbr.y0],[cbr.x1,cbr.y1],[cbr.x0,cbr.y1]], ZINC, 4, "#e4e4e7", "12 8");
+  const mor = { x0: mo.center[0]-mo.size[0]/2, x1: mo.center[0]+mo.size[0]/2, y0: mo.center[1]-mo.size[1]/2, y1: mo.center[1]+mo.size[1]/2 };
+  g.poly([[mor.x0,mor.y0],[mor.x1,mor.y0],[mor.x1,mor.y1],[mor.x0,mor.y1]], ZINC, 4, "#e4e4e7", "12 8");
+  // wheelbase dimension
+  g.line([P.D_rear_axle[0], -40], [P.F_front_axle[0], -40], MUTED, 3);
+  // CG marker
+  const cgp = [cg.x, cg.y];
+  g.line([cgp[0]-45, cgp[1]], [cgp[0]+45, cgp[1]], VIOLET, 6);
+  g.line([cgp[0], cgp[1]-45], [cgp[0], cgp[1]+45], VIOLET, 6);
+  g.dot(cgp, 12, VIOLET);
+  // clearance leader: from label anchor to nearest pack corner region
+  const clr = cl.min;
+  const anchor = [r.cx, r.y1 + 20];
+  const labY = r.y1 + 170;
+  g.line(anchor, [r.cx, labY - 25], bad ? RED : GREEN, 3, "8 6");
+  // --- labels (positions fixed in mm space: overlap-free at any scale) ---
+  S.push(label(S, labels, r.cx, r.y0 - 80, `PACK ${pack.size[0]}x${pack.size[1]}x${pack.size[2]} · ${pack.mass_kg}kg`, 36));
+  S.push(label(S, labels, r.cx, labY, `CLEARANCE ${clr >= 0 ? "+" : ""}${clr.toFixed(1)}mm ${bad ? "✗ INTERFERENCE" : "✓ FITS"}`, 36));
+  S.push(label(S, labels, -330, 1075, `TOP ${PRESET.derived.tube_length_top_mm} · DOWN ${PRESET.derived.tube_length_down_mm} · SEAT ${PRESET.derived.tube_length_seat_mm}`, 32));
+  S.push(label(S, labels, -560, -95, `WHEELBASE ${PRESET.derived.wheelbase_mm}`, 32));
+  S.push(label(S, labels, -380, 150, `CG x${Math.round(cg.x)} · ${cg.pct.toFixed(1)}% WB`, 32));
+  S.push(label(S, labels, cb.center[0], cb.center[1], `CTRL · ${cb.mass_kg}kg`, 28));
+  S.push(label(S, labels, mo.center[0], 500, `QS138 · ${mo.mass_kg}kg`, 30));
+  const err = labelsOverlap(labels);
+  return { svg: `<svg viewBox="0 0 1800 1300" xmlns="http://www.w3.org/2000/svg">${S.join("")}</svg>`, labels, clearance: clr, cg, overlapErr: err };
+}
+
+// ---- CAM_TOP ----
+function renderTop(packKey) {
+  const pack = PRESET[packKey === "72v" ? "pack_72v" : "pack_96v"];
+  const cg = cgOf(pack), r = packRect(pack);
+  const labels = [];
+  const g = ctx2d(1450, 500, 1800, 1000); // x in [-1450,350], z in [-500,500]
+  const S = g.S;
+  S.push(`<rect x="0" y="0" width="1800" height="1000" fill="#fff"/>`);
+  for (let x = -1400; x <= 300; x += 200) g.line([x, -500], [x, 500], "#f4f4f5", 2);
+  for (let z = -400; z <= 400; z += 200) g.line([-1450, z], [350, z], "#f4f4f5", 2);
+  // wheels (disc seen edge-on: diameter along x, tire width along z)
+  for (const k of ["rear", "front"]) {
+    const w = PRESET.wheels[k], [cx] = w.center;
+    g.poly([[cx-w.r,-w.width/2],[cx+w.r,-w.width/2],[cx+w.r,w.width/2],[cx-w.r,w.width/2]], INK, 5);
+  }
+  // frame centreline
+  const order = ["D_rear_axle", "C_bb", "B_steer_bottom", "A_steer_top"];
+  for (let i = 0; i < order.length-1; i++)
+    g.line(topProj(P[order[i]]), topProj(P[order[i+1]]), ZINC, 10);
+  g.line(topProj(P.C_bb), topProj(P.E_seat), ZINC, 10);
+  // pack footprint
+  const hw = pack.size[2]/2;
+  const bad = clearanceOf(pack).min < PRESET.derived.clearance_fail_mm;
+  g.poly([[r.x0,-hw],[r.x1,-hw],[r.x1,hw],[r.x0,hw]], bad ? RED : VIOLET, 6, "rgba(124,107,179,0.18)");
+  // controller / motor footprints
+  const cb = PRESET.controller_box;
+  g.poly([[cb.center[0]-100,-70],[cb.center[0]+100,-70],[cb.center[0]+100,70],[cb.center[0]-100,70]], ZINC, 4, "#e4e4e7", "12 8");
+  const mo = PRESET.motor_qs138;
+  g.poly([[mo.center[0]-110,-80],[mo.center[0]+110,-80],[mo.center[0]+110,80],[mo.center[0]-110,80]], ZINC, 4, "#e4e4e7", "12 8");
+  // wheelbase line + CG
+  g.line([P.D_rear_axle[0], 0], [P.F_front_axle[0], 0], VIOLET, 4, "14 10");
+  g.line([cg.x-50, 0], [cg.x+50, 0], VIOLET, 7);
+  g.line([cg.x, -50], [cg.x, 50], VIOLET, 7);
+  g.dot([cg.x, 0], 14, VIOLET);
+  S.push(label(S, labels, cg.x, 230, `CG x${Math.round(cg.x)} · ${cg.pct.toFixed(1)}% OF WHEELBASE`, 36));
+  S.push(label(S, labels, r.cx, -200, `PACK ${pack.size[2]} WIDE · ${pack.mass_kg}kg @ CENTROID`, 34));
+  S.push(label(S, labels, -560, 390, `WHEELBASE ${PRESET.derived.wheelbase_mm} · F ${P.F_front_axle[0]} / R ${P.D_rear_axle[0]}`, 32));
+  const err = labelsOverlap(labels);
+  return { svg: `<svg viewBox="0 0 1800 1000" xmlns="http://www.w3.org/2000/svg">${S.join("")}</svg>`, labels, cg, overlapErr: err };
+}
+
+// ---- CAM_PERSP ----
+function renderPersp(packKey) {
+  const pack = PRESET[packKey === "72v" ? "pack_72v" : "pack_96v"];
+  const cl = clearanceOf(pack), cg = cgOf(pack);
+  const labels = [];
+  const raw = [];
+  const G = {
+    line(a, b, st, wd, dash) { raw.push({ a: perspProj(a), b: perspProj(b), st, wd, dash }); },
+    poly3(pts, st, wd, fill, dash) { raw.push({ poly: pts.map(perspProj), st, wd, fill, dash }); }
+  };
+  // ground grid
+  for (let x = -1400; x <= 300; x += 200) G.line([x, 0, -500], [x, 0, 500], "#e4e4e7", 3);
+  for (let z = -500; z <= 500; z += 250) G.line([-1450, 0, z], [350, 0, z], "#e4e4e7", 3);
+  // wheels as rings
+  for (const k of ["rear", "front"]) {
+    const w = PRESET.wheels[k];
+    G.poly3(wheelRing(w.center[0], w.center[1], w.r, 24), INK, 7);
+  }
+  // frame: project thick tubes as plain lines (width in mm units)
+  const g2 = { line: (a, b, st, wd, dash) => G.line([a[0], a[1], 0], [b[0], b[1], 0], st, wd, dash) };
+  drawFrame(g2, p => p, 34);
+  // boxes
+  const bad = cl.min < PRESET.derived.clearance_fail_mm;
+  for (const [a, b] of boxEdges(...pack.center, ...pack.size).edges)
+    G.line(a, b, bad ? RED : VIOLET, 7);
+  for (const obj of [PRESET.controller_box, PRESET.motor_qs138])
+    for (const [a, b] of boxEdges(...obj.center, ...obj.size).edges)
+      G.line(a, b, ZINC, 5, "12 8");
+  // CG mast
+  G.line([cg.x, 0, 0], [cg.x, cg.y, 0], VIOLET, 4, "10 8");
+  const cgT = perspProj([cg.x, cg.y, 0]);
+  // bounds over geometry
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const eat = p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
+  for (const r2 of raw) { if (r2.poly) r2.poly.forEach(eat); else { eat(r2.a); eat(r2.b); } }
+  eat(cgT);
+  const pad = 120;
+  const packTop = perspProj([pack.center[0], pack.center[1] + pack.size[1]/2, pack.size[2]/2]);
+  // labels in projected space (corners of the composition: overlap-free by construction)
+  const lab = [];
+  const L = (x, y, text, fs) => {
+    const w = text.length * 0.62 * fs, h = fs * 1.25;
+    lab.push({ x: x - w/2, y: y - h/2, w, h, text });
+    eat([x - w/2, y - h/2]); eat([x + w/2, y + h/2]);
+    return `<text x="${x.toFixed(1)}" y="${(y + fs*0.35).toFixed(1)}" font-size="${fs}" text-anchor="middle" fill="${INK}">${text}</text>`;
+  };
+  const svgLabels = [
+    L((x0+x1)/2, y1 + pad*1.6, `PACK ${pack.size[0]}x${pack.size[1]}x${pack.size[2]} · ${pack.mass_kg}kg`, 44),
+    L((x0+x1)/2, y0 - pad*1.6, `CLEARANCE ${cl.min >= 0 ? "+" : ""}${cl.min.toFixed(1)}mm ${bad ? "✗ INTERFERENCE" : "✓ FITS"}`, 44),
+    L(x0 + 260, y0 - pad*1.6, `CG ${cg.pct.toFixed(1)}% WB`, 40)
+  ];
+  const vx = x0 - pad, vy = y0 - pad*2.6, vw = (x1 - x0) + pad*2, vh = (y1 - y0) + pad*5.2;
+  const S = [`<rect x="${vx}" y="${-vy - vh}" width="${vw}" height="${vh}" fill="#fff"/>`];
+  const X = x => x - vx, Y = y => (vy + vh) - y;
+  for (const r2 of raw) {
+    if (r2.poly) S.push(`<polygon points="${r2.poly.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ")}" fill="${r2.fill||"none"}" stroke="${r2.st}" stroke-width="${r2.wd}"${r2.dash ? ` stroke-dasharray="${r2.dash}"` : ""} stroke-linejoin="round"/>`);
+    else S.push(`<line x1="${X(r2.a[0]).toFixed(1)}" y1="${Y(r2.a[1]).toFixed(1)}" x2="${X(r2.b[0]).toFixed(1)}" y2="${Y(r2.b[1]).toFixed(1)}" stroke="${r2.st}" stroke-width="${r2.wd}"${r2.dash ? ` stroke-dasharray="${r2.dash}"` : ""} stroke-linecap="round"/>`);
+  }
+  S.push(`<circle cx="${X(cgT[0]).toFixed(1)}" cy="${Y(cgT[1]).toFixed(1)}" r="16" fill="${VIOLET}"/>`);
+  for (const t of svgLabels) S.push(t.replace(/x="([\d.-]+)" y="([\d.-]+)"/, (m, px, py) => `x="${(X(+px)).toFixed(1)}" y="${(Y(+py) + 15).toFixed(1)}"`));
+  // remap label rects into viewBox coords for the overlap check
+  const vbLabels = lab.map(l => ({ x: l.x - vx, y: (vy + vh) - (l.y + l.h), w: l.w, h: l.h, text: l.text }));
+  const err = labelsOverlap(vbLabels);
+  return { svg: `<svg viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" xmlns="http://www.w3.org/2000/svg">${S.join("")}</svg>`, labels: vbLabels, clearance: cl.min, cg, overlapErr: err };
+}
+
+function renderAll(packKey) {
+  const side = renderSide(packKey), top = renderTop(packKey), persp = renderPersp(packKey);
+  const pack = PRESET[packKey === "72v" ? "pack_72v" : "pack_96v"];
+  const cl = clearanceOf(pack);
+  const bad = cl.min < PRESET.derived.clearance_fail_mm;
+  return { side, top, persp, verdict: { bad, text: bad ? `INTERFERENCE ${cl.min.toFixed(1)}mm` : `FITS · +${cl.min.toFixed(1)}mm` } };
+}
+
+// ---- browser mount (skipped headless; guarded) ----
+if (typeof document !== "undefined") {
+  let current = PRESET.defaultPack;
+  // When served over http, fz-e.json is source of truth; file:// falls back to embedded copy.
+  fetch("./fz-e.json").then(r => { if (!r.ok) throw 0; return r.json(); }).then(j => {
+    for (const k of Object.keys(PRESET)) PRESET[k] = j[k];
+    mount();
+  }).catch(() => mount());
+  function mount() {
+    const draw = () => {
+      const out = renderAll(current);
+      document.getElementById("vSide").innerHTML = out.side.svg;
+      document.getElementById("vTop").innerHTML = out.top.svg;
+      document.getElementById("vPersp").innerHTML = out.persp.svg;
+      const v = document.getElementById("verdict");
+      v.className = out.verdict.bad ? "bad" : "ok";
+      v.id = "verdict";
+      v.textContent = (current === "72v" ? "72V " : "96V ") + out.verdict.text;
+      document.getElementById("btn72").setAttribute("aria-pressed", current === "72v");
+      document.getElementById("btn96").setAttribute("aria-pressed", current === "96v");
+      for (const o of [out.side, out.top, out.persp]) if (o.overlapErr) console.error(o.overlapErr);
+    };
+    document.getElementById("btn72").onclick = () => { current = "72v"; draw(); };
+    document.getElementById("btn96").onclick = () => { current = "96v"; draw(); };
+    draw();
+  }
+}
+</script>
+</body>
+</html>
